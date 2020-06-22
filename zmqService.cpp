@@ -320,20 +320,17 @@ void pub()
 
         ChronoScope(__FUNCTION__);
 
+        const_buffer syncsub("ack", 3);
+        syncbackend.send(syncsub);
+        zmq::message_t syncmessage;
+        recv_result_t result = syncbackend.recv(syncmessage);
+        if (result.has_value())
+        {
+            std::cout << "sync message : " << syncmessage.to_string() << std::endl;
+        }
+
         for (uint32_t i = 0; i < NUM; i++)
         {
-            if(i == 0)
-            {
-                const_buffer syncsub("ack", 3);
-                syncbackend.send(syncsub);
-                zmq::message_t syncmessage;
-                recv_result_t result = syncbackend.recv(syncmessage);
-                if (result.has_value())
-                {
-                    std::cout << "sync message : " << syncmessage.to_string() << std::endl;
-                }
-            }
-
             std::string SendMsg = std::string(strJson) + std::to_string(i);
             zmq::message_t message(SendMsg.begin(), SendMsg.end());
             send_result_t resut = backend.send(message,send_flags::none);
@@ -373,23 +370,23 @@ void sub()
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 
     bool sendFlag = false;
+    if (sendFlag == false)
+    {
+        zmq::message_t syncmessage;
+        recv_result_t syncresult = syncfrontend.recv(syncmessage);
+        if (syncresult.has_value())
+        {
+            std::cout << "syncfrontend result : " << syncmessage.to_string() << std::endl;
+            zmq::message_t ackmessage("ack", 3);
+            syncfrontend.send(ackmessage, send_flags::none);
+            sendFlag = true;
+            std::cout << "sendFlag is :" << sendFlag << std::endl;
+        }
+    }
 
     for (;;)
     {
         //if(count % 1000 == 0 && sendFlag == false)
-        if(sendFlag == false)
-        {
-            zmq::message_t syncmessage;
-            recv_result_t syncresult = syncfrontend.recv(syncmessage);
-            if (syncresult.has_value())
-            {
-                std::cout << "syncfrontend result : " << syncmessage.to_string() << std::endl;
-                zmq::message_t ackmessage("ack", 3);
-                syncfrontend.send(ackmessage,send_flags::none);
-                sendFlag = true;
-                std::cout << "sendFlag is :" << sendFlag << std::endl;
-            }
-        }
         zmq::message_t message;
         recv_result_t result = frontend.recv(message);
 
@@ -410,11 +407,6 @@ void sub()
                           << "ChronoScope: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
                           << "ms." << std::endl;
                 break;
-            }
-
-            if(count % 1000 == 0)
-            {
-                //sendFlag = false;
             }
         }
         else
